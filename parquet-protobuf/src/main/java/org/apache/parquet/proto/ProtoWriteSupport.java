@@ -203,7 +203,7 @@ public class ProtoWriteSupport<T extends MessageOrBuilder> extends WriteSupport<
       StringBuilder nameNumberPairs = new StringBuilder();
       if (enumNameNumberMapping.getValue().isEmpty()) {
         // No enum is ever written to any column of this file, put an empty string as the value in the metadata
-        LOG.info("No enum is written for {}", enumNameNumberMapping.getKey());
+        LOG.debug("No enum is written for {}", enumNameNumberMapping.getKey());
       }
       int idx = 0;
       for (Map.Entry<String, Integer> nameNumberPair :
@@ -480,6 +480,9 @@ public class ProtoWriteSupport<T extends MessageOrBuilder> extends WriteSupport<
             continue;
           }
           int fieldIndex = fieldDescriptor.getIndex();
+          if (fieldIndex >= fieldWriters.length) {
+              System.out.println();
+          }
           FieldWriter fieldWriter = fieldWriters[fieldIndex];
           fieldWriter.writeField(pb.getField(fieldDescriptor));
         }

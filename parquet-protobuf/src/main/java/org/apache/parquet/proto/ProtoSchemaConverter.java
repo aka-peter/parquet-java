@@ -1,3 +1,4 @@
+//@formatter:off
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -230,39 +231,75 @@ public class ProtoSchemaConverter {
       if (unwrapProtoWrappers) {
         Descriptor messageType = descriptor.getMessageType();
         if (messageType.equals(Timestamp.getDescriptor())) {
+          if (descriptor.isRepeated() && parquetSpecsCompliant) {
+            return addRepeatedPrimitive(INT64, timestampType(true, TimeUnit.NANOS), builder);
+          }
           return builder.primitive(INT64, getRepetition(descriptor)).as(timestampType(true, TimeUnit.NANOS));
         }
         if (messageType.equals(Date.getDescriptor())) {
+          if (descriptor.isRepeated() && parquetSpecsCompliant) {
+            return addRepeatedPrimitive(INT32, dateType(), builder);
+          }
           return builder.primitive(INT32, getRepetition(descriptor)).as(dateType());
         }
         if (messageType.equals(TimeOfDay.getDescriptor())) {
+          if (descriptor.isRepeated() && parquetSpecsCompliant) {
+            return addRepeatedPrimitive(INT64, timestampType(true, TimeUnit.NANOS), builder);
+          }
           return builder.primitive(INT64, getRepetition(descriptor)).as(timeType(true, TimeUnit.NANOS));
         }
         if (messageType.equals(DoubleValue.getDescriptor())) {
+          if (descriptor.isRepeated() && parquetSpecsCompliant) {
+            return addRepeatedPrimitive(DOUBLE, builder);
+          }
           return builder.primitive(DOUBLE, getRepetition(descriptor));
         }
         if (messageType.equals(StringValue.getDescriptor())) {
+          if (descriptor.isRepeated() && parquetSpecsCompliant) {
+            return addRepeatedPrimitive(BINARY, builder);
+          }
           return builder.primitive(BINARY, getRepetition(descriptor)).as(stringType());
         }
         if (messageType.equals(BoolValue.getDescriptor())) {
+          if (descriptor.isRepeated() && parquetSpecsCompliant) {
+            return addRepeatedPrimitive(BOOLEAN, builder);
+          }
           return builder.primitive(BOOLEAN, getRepetition(descriptor));
         }
         if (messageType.equals(FloatValue.getDescriptor())) {
+          if (descriptor.isRepeated() && parquetSpecsCompliant) {
+            return addRepeatedPrimitive(FLOAT, builder);
+          }
           return builder.primitive(FLOAT, getRepetition(descriptor));
         }
         if (messageType.equals(Int64Value.getDescriptor())) {
+          if (descriptor.isRepeated() && parquetSpecsCompliant) {
+            return addRepeatedPrimitive(INT64, builder);
+          }
           return builder.primitive(INT64, getRepetition(descriptor));
         }
         if (messageType.equals(UInt64Value.getDescriptor())) {
+          if (descriptor.isRepeated() && parquetSpecsCompliant) {
+            return addRepeatedPrimitive(INT64, builder);
+          }
           return builder.primitive(INT64, getRepetition(descriptor));
         }
         if (messageType.equals(Int32Value.getDescriptor())) {
+          if (descriptor.isRepeated() && parquetSpecsCompliant) {
+            return addRepeatedPrimitive(INT32, builder);
+          }
           return builder.primitive(INT32, getRepetition(descriptor));
         }
         if (messageType.equals(UInt32Value.getDescriptor())) {
+          if (descriptor.isRepeated() && parquetSpecsCompliant) {
+            return addRepeatedPrimitive(INT64, builder);
+          }
           return builder.primitive(INT64, getRepetition(descriptor));
         }
         if (messageType.equals(BytesValue.getDescriptor())) {
+          if (descriptor.isRepeated() && parquetSpecsCompliant) {
+            return addRepeatedPrimitive(BINARY, builder);
+          }
           return builder.primitive(BINARY, getRepetition(descriptor));
         }
       }
@@ -275,8 +312,21 @@ public class ProtoSchemaConverter {
       // the old schema style did not include the LIST wrapper around repeated fields
       return addRepeatedPrimitive(parquetType.primitiveType, parquetType.logicalTypeAnnotation, builder);
     }
-    Repetition repetition = unwrapProtoWrappers ? Repetition.REQUIRED : getRepetition(descriptor);
+    Repetition repetition = getRepetition(descriptor);
+    // Repetition repetition = unwrapProtoWrappers ? Repetition.REQUIRED : getRepetition(descriptor);
     return builder.primitive(parquetType.primitiveType, repetition).as(parquetType.logicalTypeAnnotation);
+  }
+
+
+  private static <T> Builder<? extends Builder<?, GroupBuilder<T>>, GroupBuilder<T>> addRepeatedPrimitive(
+      PrimitiveTypeName primitiveType,
+      final GroupBuilder<T> builder) {
+    return builder.group(Type.Repetition.OPTIONAL)
+        .as(listType())
+        .group(Type.Repetition.REPEATED)
+        .primitive(primitiveType, Type.Repetition.REQUIRED)
+        .named("element")
+        .named("list");
   }
 
   private static <T> Builder<? extends Builder<?, GroupBuilder<T>>, GroupBuilder<T>> addRepeatedPrimitive(
@@ -394,7 +444,8 @@ public class ProtoSchemaConverter {
       case STRING:
         return ParquetType.of(BINARY, stringType());
       case ENUM:
-        return ParquetType.of(BINARY, enumType());
+          return ParquetType.of(BINARY, enumType());
+//          return ParquetType.of(BINARY, stringType());
       case BYTE_STRING:
         return ParquetType.of(BINARY);
       default:
@@ -420,3 +471,5 @@ public class ProtoSchemaConverter {
     }
   }
 }
+//@formatter:on
+

@@ -18,30 +18,15 @@
  */
 package org.apache.parquet.proto;
 
-import static com.google.protobuf.Descriptors.FieldDescriptor.JavaType;
 import static java.util.Optional.of;
 import static org.apache.parquet.proto.ProtoConstants.CONFIG_ACCEPT_UNKNOWN_ENUM;
 import static org.apache.parquet.proto.ProtoConstants.CONFIG_IGNORE_UNKNOWN_FIELDS;
 import static org.apache.parquet.proto.ProtoConstants.METADATA_ENUM_ITEM_SEPARATOR;
 import static org.apache.parquet.proto.ProtoConstants.METADATA_ENUM_KEY_VALUE_SEPARATOR;
 import static org.apache.parquet.proto.ProtoConstants.METADATA_ENUM_PREFIX;
-
-import com.google.protobuf.BoolValue;
-import com.google.protobuf.ByteString;
-import com.google.protobuf.BytesValue;
-import com.google.protobuf.DescriptorProtos;
-import com.google.protobuf.Descriptors;
-import com.google.protobuf.Descriptors.Descriptor;
-import com.google.protobuf.DoubleValue;
-import com.google.protobuf.FloatValue;
-import com.google.protobuf.Int32Value;
-import com.google.protobuf.Int64Value;
-import com.google.protobuf.Message;
-import com.google.protobuf.StringValue;
-import com.google.protobuf.UInt32Value;
-import com.google.protobuf.UInt64Value;
-import com.google.protobuf.util.Timestamps;
-import com.twitter.elephantbird.util.Protobufs;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.HashMap;
@@ -68,6 +53,23 @@ import org.apache.parquet.schema.PrimitiveType;
 import org.apache.parquet.schema.Type;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.google.protobuf.BoolValue;
+import com.google.protobuf.ByteString;
+import com.google.protobuf.BytesValue;
+import com.google.protobuf.DescriptorProtos;
+import com.google.protobuf.Descriptors;
+import com.google.protobuf.Descriptors.Descriptor;
+import com.google.protobuf.Descriptors.FieldDescriptor.JavaType;
+import com.google.protobuf.DoubleValue;
+import com.google.protobuf.FloatValue;
+import com.google.protobuf.Int32Value;
+import com.google.protobuf.Int64Value;
+import com.google.protobuf.Message;
+import com.google.protobuf.StringValue;
+import com.google.protobuf.UInt32Value;
+import com.google.protobuf.UInt64Value;
+import com.google.protobuf.util.Timestamps;
+import com.twitter.elephantbird.util.Protobufs;
 
 /**
  * Converts Protocol Buffer message (both top level and inner) to parquet.
@@ -564,6 +566,11 @@ class ProtoMessageConverter extends GroupConverter {
     public void addInt(int value) {
       parent.add(value);
     }
+
+    @Override
+    public void addLong(long value) {
+      parent.add((int)value);
+    }
   }
 
   static final class ProtoLongConverter extends PrimitiveConverter {
@@ -578,6 +585,39 @@ class ProtoMessageConverter extends GroupConverter {
     public void addLong(long value) {
       parent.add(value);
     }
+
+    @Override
+    public void addBinary(Binary value) {
+      parent.add(binaryToDecimal(value, 38, 0).toBigInteger().longValueExact());
+    }
+
+    BigDecimal binaryToDecimal(Binary value, int precision, int scale) {
+        /*
+         * Precision <= 18 checks for the max number of digits for an unscaled long,
+         * else treat with big integer conversion
+         */
+        if (precision <= 18) {
+          ByteBuffer buffer = value.toByteBuffer();
+          byte[] bytes = buffer.array();
+          int start = buffer.arrayOffset() + buffer.position();
+          int end = buffer.arrayOffset() + buffer.limit();
+          long unscaled = 0L;
+          int i = start;
+          while (i < end) {
+            unscaled = (unscaled << 8 | bytes[i] & 0xff);
+            i++;
+          }
+          int bits = 8 * (end - start);
+          long unscaledNew = (unscaled << (64 - bits)) >> (64 - bits);
+          if (unscaledNew <= -Math.pow(10, 18) || unscaledNew >= Math.pow(10, 18)) {
+            return new BigDecimal(unscaledNew);
+          } else {
+            return BigDecimal.valueOf(unscaledNew / Math.pow(10, scale));
+          }
+        } else {
+          return new BigDecimal(new BigInteger(value.getBytes()), scale);
+        }
+      }    
   }
 
   static final class ProtoStringConverter extends PrimitiveConverter {
